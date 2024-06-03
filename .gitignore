@@ -3,5 +3,6 @@
 /gui/__pycache__/
 /logs/
 /rov_images/
-/.DS_Store
-/.vscode
+.DS_Store
+.vscode
+/widgets.py
