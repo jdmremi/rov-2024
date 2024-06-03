@@ -3,4 +3,4 @@
 /gui/__pycache__/
 /logs/
 /rov_images/
-.DS_Store
+/.DS_Store
