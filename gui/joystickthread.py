@@ -16,7 +16,7 @@ YELLOW_TEXT_CSS = "color: yellow"
 class JoystickThread(QThread):
     joystick_change_signal = pyqtSignal(dict)
 
-    def __init__(self, x_bar, y_bar, z_bar, status_bar):
+    def __init__(self, x_bar, y_bar, z_bar, status_bar, arduino_thread, video_thread):
         super().__init__()
         logger.info("Joystick thread initialized")
         self.__run_flag = True
@@ -26,6 +26,8 @@ class JoystickThread(QThread):
         self.__y_bar = y_bar
         self.__z_bar = z_bar
         self.__connection_status_bar = status_bar
+        self.__arduino_thread = arduino_thread
+        self.__video_thread = video_thread
 
         pygame.init()
         # If no joysticks are initially connected, we run wait_for_joystick() which waits for new joysticks to be connected.
@@ -76,6 +78,10 @@ class JoystickThread(QThread):
     def check_joystick_input(self):
         if self.__joystick is not None and pygame.joystick.get_count() > 0:
             pygame.event.pump()
+
+            for event in pygame.event.get():
+                if event.type == pygame.JOYBUTTONDOWN and event.button == 4:
+                    self.__video_thread.save_screenshot()
 
             joystick_info = {}
 

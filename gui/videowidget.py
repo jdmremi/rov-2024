@@ -5,7 +5,7 @@ import logging
 import coloredlogs
 
 # Local
-from video import VideoThread
+from videothread import VideoThread
 
 WINDOW_TITLE = "ROV Control"
 VIDEO_WIDTH = int(640*1.25)
@@ -38,3 +38,6 @@ class VideoWidget(QWidget):
     def update_image(self, cv_img):
         qt_img = self.__video_thread.convert_cv_qt(cv_img)
         self.__image_label.setPixmap(qt_img)
+
+    def get_video_thread(self):
+        return self.__video_thread

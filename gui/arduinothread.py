@@ -39,7 +39,7 @@ class ArduinoThread(QThread):
         # If system platform is macos, linux, windows, etc:
         # get port name specific to platform
         # then, self.ser = ...
-        platform = None
+        detected_platform = None
 
         match platform.system():
             case "Darwin":  # macOS

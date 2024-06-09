@@ -64,13 +64,14 @@ class Main(QMainWindow):
         # Initialize the Joystick thread and pass in the relevant progress bars/labels so that the thread can update them.
         # We pass in the arduino thread so that our joystick can send the data to it directly.
         # It is also used here to update GUI elements.
-        self.__arduino_thread = ArduinoThread()
+        self.__arduino_thread = None  # Change this
         self.__joystick_thread = JoystickThread(
             self.__status_bar_widgets.get("xThrust"),
             self.__status_bar_widgets.get("yThrust"),
             self.__status_bar_widgets.get("zThrust"),
             self.__status_bar_widgets.get("joystickStatus"),
-            self.__arduino_thread
+            self.__arduino_thread,
+            self.__video_widget.get_video_thread()
         )
 
         # Start the program with the window fully maximized
