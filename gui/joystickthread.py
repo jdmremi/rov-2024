@@ -80,9 +80,11 @@ class JoystickThread(QThread):
             pygame.event.pump()
 
             for event in pygame.event.get():
+                # If the button pressed is the button just to the right of the left thumbstick (Xbox One Series X fcontroller), take a screenshot.
                 if event.type == pygame.JOYBUTTONDOWN and event.button == 4:
                     self.__video_thread.save_screenshot()
 
+            # Holds joystick information to be sent to Arduino/GUI.
             joystick_info = {}
 
             """
@@ -105,12 +107,14 @@ class JoystickThread(QThread):
             y = -y * 1.414
             x = x * 1.414
 
-            # Rotate x and y axis of joystick 45 degrees:
+            # Rotate x and y axis of joystick 45 degrees.
+            # Uses a 2x2 rotation matrix to calculate: https://en.wikipedia.org/wiki/Rotation_matrix
             x_new = (x*math.cos(math.pi/-4)) - \
                 (y*math.sin(math.pi/-4))  # horizontal left
             y_new = (x*math.sin(math.pi/-4)) + \
                 (y*math.cos(math.pi/-4))  # horizontal right
 
+            # If joystick inputs go over 1.0 (which is possible), let's just say that their max value is 1.0
             if x_new > 1:
                 x_new = 1.0
             if y_new > 1:
@@ -133,14 +137,18 @@ class JoystickThread(QThread):
 
             rumble_freq = 0
 
+            # This determines the intensity of which the joystick rumbles.
             if x_new != 0:
                 rumble_freq = x_new
             if y_new != 0:
                 rumble_freq = y_new
             elif -z**3 != 0:
                 rumble_freq = -z**3
-
             self.__joystick.rumble(0, abs(rumble_freq), 1)
+
+            # Send data to Arduino for processing.
+            self.__arduino_thread.handle_data(joystick_info)
+
             self.joystick_change_signal.emit(joystick_info)
             self.__connection_status_bar.setText(
                 f"Joystick ({self.__joystick.get_name()}) connected")
