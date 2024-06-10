@@ -25,8 +25,7 @@ class Main(QMainWindow):
 
         logger = logging.getLogger(__name__)
         logger.info("MainWindow initialized")
-        logger.info(f"Display found: Width = {
-            width}, Height = {height}")
+        logger.info(f"Display found: Width = {width}, Height = {height}")
 
         self.__layout = QHBoxLayout()
 
@@ -51,8 +50,7 @@ class Main(QMainWindow):
         # Add all of the relevant widgets to the status bar
         for widgetName, widget in self.__status_bar_widgets.items():
             self.__status_bar.addWidget(widget)
-            logger.info(f"Successfully initialized {
-                widgetName} widget!")
+            logger.info(f"Successfully initialized {widgetName} widget!")
             # Spacing in between widgets
             self.__status_bar.addWidget(QLabel(text=" | "))
         # <3
@@ -61,10 +59,12 @@ class Main(QMainWindow):
         self.setCentralWidget(self.__container)
         self.setStatusBar(self.__status_bar)
 
+        # Initialize the Arduino thread
+        self.__arduino_thread = ArduinoThread()
+        self.__arduino_thread.arduino_data_channel_signal.connect(
+            self.update_arduino_status)
+
         # Initialize the Joystick thread and pass in the relevant progress bars/labels so that the thread can update them.
-        # We pass in the arduino thread so that our joystick can send the data to it directly.
-        # It is also used here to update GUI elements.
-        self.__arduino_thread = None  # Change this
         self.__joystick_thread = JoystickThread(
             self.__status_bar_widgets.get("xThrust"),
             self.__status_bar_widgets.get("yThrust"),
@@ -76,6 +76,15 @@ class Main(QMainWindow):
 
         # Start the program with the window fully maximized
         self.showMaximized()
+
+    def update_arduino_status(self, data):
+        # Update the status bar with data from the Arduino
+        temperature = data.get('temp', 0.0)
+        voltage = data.get('volt', 0.0)
+        self.__status_bar_widgets["arduinoTemperature"].setText(
+            f"Arduino Temperature: {temperature:.2f}°C")
+        self.__status_bar_widgets["arduinoVoltage"].setText(
+            f"Arduino Voltage: {voltage:.2f}V")
 
 
 if __name__ == "__main__":
