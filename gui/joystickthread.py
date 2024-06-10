@@ -1,5 +1,4 @@
-from PyQt5.QtCore import pyqtSignal, QThread
-from PyQt5.QtCore import QTimer, pyqtSlot
+from PyQt5.QtCore import pyqtSignal, QThread, QTimer, pyqtSlot
 import pygame
 import math
 import logging
@@ -10,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 GREEN_TEXT_CSS = "color: green"
 RED_TEXT_CSS = "color: red"
-YELLOW_TEXT_CSS = "color: yellow"
 
 
 class JoystickThread(QThread):
@@ -30,13 +28,15 @@ class JoystickThread(QThread):
 
         pygame.init()
 
+        # Initialize the timer to periodically check for joystick connection
+        self._wait_for_joystick_timer = QTimer(self)
+        self._wait_for_joystick_timer.timeout.connect(self._wait_for_joystick)
+
         if pygame.joystick.get_count() == 0:
             logger.warn("No joystick detected! Waiting for joysticks...")
-            self.__wait_for_joystick()
+            self._wait_for_joystick_timer.start(1000)  # Check every second
         else:
-            self.__joystick = pygame.joystick.Joystick(0)
-            self.__joystick.init()
-            logger.info(f"Joystick found! Name: {self.__joystick.get_name()}")
+            self._initialize_joystick()
 
         self.joystick_change_signal.connect(self.handle_joystick)
         self.start()
@@ -49,14 +49,20 @@ class JoystickThread(QThread):
         self.__run_flag = False
         self.wait()
 
-    def __wait_for_joystick(self):
-        logger.debug("Waiting for joystick...")
+    def _wait_for_joystick(self):
         pygame.quit()
         pygame.init()
-        if pygame.joystick.get_count() > 0 and self.__joystick is not None:
-            self.__joystick = pygame.joystick.Joystick(0)
-            self.__joystick.init()
-            logger.info(f"Joystick found! Name: {self.__joystick.get_name()}")
+        if pygame.joystick.get_count() > 0:
+            self._initialize_joystick()
+            self._wait_for_joystick_timer.stop()
+
+    def _initialize_joystick(self):
+        self.__joystick = pygame.joystick.Joystick(0)
+        self.__joystick.init()
+        logger.info(f"Joystick found! Name: {self.__joystick.get_name()}")
+        self.__connection_status_bar.setText(
+            f"Joystick ({self.__joystick.get_name()}) connected")
+        self.__connection_status_bar.setStyleSheet(GREEN_TEXT_CSS)
 
     @pyqtSlot(dict)
     def handle_joystick(self, commands):
@@ -89,12 +95,8 @@ class JoystickThread(QThread):
             y = -y * 1.414
             x = x * 1.414
 
-            logger.debug(f"x = {x}, y = {y}")
-
             x_new = (x * math.cos(math.pi / -4)) - (y * math.sin(math.pi / -4))
             y_new = (x * math.sin(math.pi / -4)) + (y * math.cos(math.pi / -4))
-
-            logger.debug(f"x_new = {x_new}, y_new = {y_new}")
 
             x_new = max(min(x_new, 1.0), -1.0)
             y_new = max(min(y_new, 1.0), -1.0)
@@ -112,12 +114,11 @@ class JoystickThread(QThread):
             rumble_freq = max(abs(x_new), abs(y_new), abs(-z ** 3))
             self.__joystick.rumble(0, abs(rumble_freq), 1)
 
+            self.__arduino_thread.handle_data(joystick_info)
+
             self.joystick_change_signal.emit(joystick_info)
-            self.__connection_status_bar.setText(
-                f"Joystick ({self.__joystick.get_name()}) connected")
-            self.__connection_status_bar.setStyleSheet(GREEN_TEXT_CSS)
         else:
             self.joystick_change_signal.emit({"connected": False})
             self.__connection_status_bar.setText(f"Joystick disconnected")
             self.__connection_status_bar.setStyleSheet(RED_TEXT_CSS)
-            self.__wait_for_joystick()
+            self._wait_for_joystick()

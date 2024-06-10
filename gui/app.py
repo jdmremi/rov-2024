@@ -23,7 +23,6 @@ class Main(QMainWindow):
         self.setWindowTitle(WINDOW_TITLE)
         self.setMinimumSize(width, height)
 
-        logger = logging.getLogger(__name__)
         logger.info("MainWindow initialized")
         logger.info(f"Display found: Width = {width}, Height = {height}")
 
@@ -35,6 +34,7 @@ class Main(QMainWindow):
         self.__layout.addWidget(self.__video_widget)
         self.__container = QWidget()
         self.__container.setLayout(self.__layout)
+
         # Status bar related widgets, etc.
         self.__status_bar = QStatusBar()
         self.__status_bar_widgets = {
@@ -53,6 +53,7 @@ class Main(QMainWindow):
             logger.info(f"Successfully initialized {widgetName} widget!")
             # Spacing in between widgets
             self.__status_bar.addWidget(QLabel(text=" | "))
+
         # <3
         self.__status_bar.addWidget(QLabel(text="Made with ❤️"))
 
@@ -81,6 +82,8 @@ class Main(QMainWindow):
         # Update the status bar with data from the Arduino
         temperature = data.get('temp', 0.0)
         voltage = data.get('volt', 0.0)
+        logger.debug(
+            f"Received data - Temperature: {temperature}, Voltage: {voltage}")
         self.__status_bar_widgets["arduinoTemperature"].setText(
             f"Arduino Temperature: {temperature:.2f}°C")
         self.__status_bar_widgets["arduinoVoltage"].setText(
