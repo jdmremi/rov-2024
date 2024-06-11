@@ -59,6 +59,7 @@ class VideoThread(QThread):
         if not os.path.exists(path):
             os.mkdir(path)
 
+        # Generate random file name
         if self.__recent_frame is not None:
             file_name = ''.join(random.SystemRandom().choice(
                 string.ascii_uppercase + string.digits) for _ in range(6))
