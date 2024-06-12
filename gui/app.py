@@ -42,10 +42,10 @@ class Main(QMainWindow):
             "arduinoTemperature": QLabel(text="Arduino Temperature: 0.00°C"),
             "arduinoVoltage": QLabel(text="Arduino Voltage: 0.00V"),
             "clawStatus": QLabel(text="Claw status: Open/Closed..."),
-            "tLeft_LeftRightBar": QProgressBar(),
-            "tLeft_UpDownBar": QProgressBar(),
-            "tRight_LeftRightBar": QProgressBar(),
-            "tRight_UpDownBar": QProgressBar()
+            "forwardBackwardThrustStatusLabel": QLabel(),
+            "leftRightThrustStatusLabel": QLabel(),
+            "verticalThrustStatusLabel": QLabel(),
+            "pitchThrustStatusLabel": QLabel()
         }
         self.__status_bar.addWidget(QLabel(text=" "))
         # Add all of the relevant widgets to the status bar
@@ -68,10 +68,10 @@ class Main(QMainWindow):
 
         # Initialize the Joystick thread and pass in the relevant progress bars/labels so that the thread can update them.
         self.__joystick_thread = JoystickThread(
-            self.__status_bar_widgets.get("tLeft_LeftRightBar"),
-            self.__status_bar_widgets.get("tLeft_UpDownBar"),
-            self.__status_bar_widgets.get("tRight_LeftRightBar"),
-            self.__status_bar_widgets.get("tRight_UpDownBar"),
+            self.__status_bar_widgets.get("forwardBackwardThrustStatusLabel"),
+            self.__status_bar_widgets.get("leftRightThrustStatusLabel"),
+            self.__status_bar_widgets.get("verticalThrustStatusLabel"),
+            self.__status_bar_widgets.get("pitchThrustStatusLabel"),
             self.__status_bar_widgets.get("joystickStatus"),
             self.__arduino_thread,
             self.__video_widget.get_video_thread()

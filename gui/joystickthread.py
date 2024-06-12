@@ -21,17 +21,16 @@ class JoystickThread(QThread):
     # Takes in the GUI elements so that they can be updated in this thread.
     # Also takes in the video thread to take screenshots.
     # Also takes in the arduino thread to send data to the arduino.
-    def __init__(self, left_thumbstick_left_right_bar, left_thumbstick_up_down_bar, right_thumbstick_left_right_bar, right_thumbstick_up_down_bar, status_bar, arduino_thread, video_thread):
+    def __init__(self, forward_backward_thrust_label, left_right_thrust_label, vertical_thrust_label, pitch_thrust_label, status_bar, arduino_thread, video_thread):
         super().__init__()
         logger.info("Joystick thread initialized")
         self.__run_flag = True
         self.__joystick = None
         # References to various GUI elements.
-        # Todo: Use percentages instead of these progress bars instead. (QLabels)
-        self.__left_thumbstick_left_right_bar = left_thumbstick_left_right_bar
-        self.__left_thumbstick_up_down_bar = left_thumbstick_up_down_bar
-        self.__right_thumbstick_left_right_bar = right_thumbstick_left_right_bar
-        self.__right_thumbstick_up_down_bar = right_thumbstick_up_down_bar
+        self.__forward_backward_thrust_label = forward_backward_thrust_label
+        self.__left_right_thrust_label = left_right_thrust_label
+        self.__vertical_thrust_label = vertical_thrust_label
+        self.__pitch_thrust_label = pitch_thrust_label
         self.__connection_status_bar = status_bar
         # References to Arduino and video threads.
         self.__arduino_thread = arduino_thread
@@ -121,16 +120,6 @@ class JoystickThread(QThread):
             right_thumbstick_left_right = self.__joystick.get_axis(2)
             right_thumbstick_up_down = -self.__joystick.get_axis(3)
 
-            axis_info = {
-                "tLeft_LeftRight": left_thumbstick_left_right,
-                "tLeft_UpDown": left_thumbstick_up_down,
-                "tRight_LeftRight": right_thumbstick_left_right,
-                "tRight_UpDown": right_thumbstick_up_down
-            }
-
-            pulsewidths = self.__calculate_pulsewidth(axis_info)
-            logger.debug("Pulsewidths: %s", pulsewidths)
-
             # Define a deadzone - This helps so that even the smallest of movements to the joystick don't cause sudden movement to the robot.
             if abs(left_thumbstick_left_right) < DEADZONE_MIN:
                 left_thumbstick_left_right = 0
@@ -140,6 +129,17 @@ class JoystickThread(QThread):
                 right_thumbstick_left_right = 0
             if abs(right_thumbstick_up_down) < DEADZONE_MIN:
                 right_thumbstick_up_down = 0
+
+            axis_info = {
+                "tLeft_LeftRight": left_thumbstick_left_right,
+                "tLeft_UpDown": left_thumbstick_up_down,
+                "tRight_LeftRight": right_thumbstick_left_right,
+                "tRight_UpDown": right_thumbstick_up_down
+            }
+
+            # Calculate the pulsewidths that need to be sent to the Arduino.
+            pulsewidths = self.__calculate_pulsewidth(axis_info)
+            logger.debug("Pulsewidths: %s", pulsewidths)
 
             # Debug
             # logger.debug("left_thumbstick_left_right = %s",
@@ -151,24 +151,29 @@ class JoystickThread(QThread):
             # logger.debug("right_thumbstick_up_down = %s",
             #             right_thumbstick_up_down)
 
-            # Updates the GUI elements. Round to nearest integer, make positive, and multiply by 100 (to turn into a percentage).
-            self.__left_thumbstick_left_right_bar.setValue(
-                round(abs(left_thumbstick_left_right)) * 100)
-            self.__left_thumbstick_up_down_bar.setValue(
-                round(abs(left_thumbstick_up_down)) * 100)
-            self.__right_thumbstick_left_right_bar.setValue(
-                round(abs(right_thumbstick_left_right)) * 100)
-            self.__right_thumbstick_up_down_bar.setValue(
-                round(abs(right_thumbstick_up_down)) * 100)
+            # Updates the GUI thrust labels based on their pulsewidth
+            self.__update_thrust_labels(pulsewidths)
 
             # Holds json to be sent to Arduino
+            """
+        return {
+            "forward_backward_pulsewidth": round(forward_backward_pulsewidth),
+            "left_pulsewidth": round(left_pulsewidth),
+            "right_pulsewidth": round(right_pulsewidth),
+            "ascend_descend_pulsewidth": round(ascend_descend_pulsewidth),
+            "pitch_left_pulsewidth": round(pitch_left_pulsewidth),
+            "pitch_right_pulsewidth": round(pitch_right_pulsewidth)
+        }
+            """
             joystick_info = {
                 "connected": True,
                 "joystickName": self.__joystick.get_name(),
-                "tLeft_LeftRight": left_thumbstick_left_right,
-                "tLeft_UpDown": left_thumbstick_up_down,
-                "tRight_LeftRight": right_thumbstick_left_right,
-                "tRight_UpDown": right_thumbstick_up_down
+                "forward_backward_pulsewidth": pulsewidths["forward_backward_pulsewidth"],
+                "left_pulsewidth": pulsewidths["left_pulsewidth"],
+                "right_pulsewidth": pulsewidths["right_pulsewidth"],
+                "ascend_descend_pulsewidth": pulsewidths["ascend_descend_pulsewidth"],
+                "pitch_left_pulsewidth": pulsewidths["pitch_left_pulsewidth"],
+                "pitch_right_pulsewidth": pulsewidths["pitch_right_pulsewidth"]
             }
             # Determine the rumble frequency for the joystick.
             # Finds the highest value out of all of the joystick thumbstick axes to determine rumble frequency.
@@ -317,3 +322,77 @@ class JoystickThread(QThread):
             return 1500
         else:
             return 400*(val + 1) + 1100
+
+    def __update_thrust_labels(self, pulsewidths):
+        # If forward thrust (pw > 1500): say direction is forward with thrust percentage
+        forward_backward_thrust_label_text = None
+        vertical_thrust_label_text = None
+        left_right_thrust_label_text = None
+        pitch_thrust_label_text = None
+
+        fb_pw = pulsewidths["forward_backward_pulsewidth"]
+        v_pw = pulsewidths["ascend_descend_pulsewidth"]
+        l_pw = pulsewidths["left_pulsewidth"]
+        r_pw = pulsewidths["right_pulsewidth"]
+        pl_pw = pulsewidths["pitch_left_pulsewidth"]
+        pr_pw = pulsewidths["pitch_right_pulsewidth"]
+
+        # Reverse thrust (< 1500)
+        if fb_pw < 1500:
+            fb_pw_percent = (fb_pw/1100.0)*100.0
+            forward_backward_thrust_label_text = "Backward" + \
+                f" ({fb_pw_percent:.2f}% power)"
+        # No thrust
+        elif fb_pw == 1500:
+            forward_backward_thrust_label_text = "0.00% power"
+        # Forward thrust (> 1500)
+        else:
+            fb_pw_percent = (fb_pw/1900.0)*100.0
+            forward_backward_thrust_label_text = "Forward" + \
+                f" ({fb_pw_percent:.2f}% power)"
+
+        # Downward thrust:
+        if v_pw < 1500:
+            v_pw_percent = (v_pw/1100.0)*100.0
+            vertical_thrust_label_text = "Downward" + \
+                f" ({v_pw_percent:.2f}% power)"
+        elif v_pw == 1500:
+            vertical_thrust_label_text = "0.00% power"
+        # Upward thrust:
+        else:
+            v_pw_percent = (v_pw/1900.0)*100.0
+            vertical_thrust_label_text = "Upward" + \
+                f" ({v_pw_percent:.2f}% power)"
+
+        # Turning left (l_pw < r_pw)
+        if l_pw < r_pw:
+            l_r_percent = (r_pw/1900.0)*100.0
+            left_right_thrust_label_text = "Left" + \
+                f" ({l_r_percent:.2f}% power)"
+        # both are 1500
+        elif l_pw == 1500 and r_pw == 1500 or l_pw == r_pw:
+            left_right_thrust_label_text = "0.00% power"
+        # Turning right (l_pw > r_pw)
+        else:
+            l_r_percent = (l_pw/1900.0)*100.0
+            left_right_thrust_label_text = "Right" + \
+                f" ({l_r_percent:.2f}% power)"
+
+        # Pitch counter-clockwise (pl_pw < pr_pw)
+        if pl_pw < pr_pw:
+            p_percent = (pr_pw/1900.0)*100.0
+            pitch_thrust_label_text = "CCW" + f" ({p_percent:.2f}% power)"
+        # both are 1500 or equal
+        elif pl_pw == 1500 and pr_pw == 1500 or pl_pw == pr_pw:
+            pitch_thrust_label_text = "0.00% power"
+        else:
+            p_percent = (pl_pw/1900.0)*100.0
+            pitch_thrust_label_text = "CW" + f" ({p_percent:.2f}% power)"
+
+        self.__forward_backward_thrust_label.setText(
+            forward_backward_thrust_label_text)
+        self.__vertical_thrust_label.setText(
+            vertical_thrust_label_text)
+        self.__left_right_thrust_label.setText(
+            left_right_thrust_label_text)
+        self.__pitch_thrust_label.setText(pitch_thrust_label_text)
