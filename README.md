@@ -1,11 +1,11 @@
 # rov
 
-- This is code that was written in-house for the Deep Sea Dogs ROV "T.O.A.S.T." which will be participating in the 2024 MATE ROV World Championship
+- This is code that was written in-house for the Deep Sea Dogs ROV "T.O.A.S.T." which will be participating in the 2024 MATE ROV World Championship.
 
 # Requirements
 
-- Python 3.12.3
-- Full instatllation of dependencies (`pip install -r requirements.txt`)
+- Python 3.12.3.
+- Full instatllation of dependencies (`pip install -r requirements.txt`).
 
 # Running
 
