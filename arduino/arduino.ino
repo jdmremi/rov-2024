@@ -1,63 +1,70 @@
 #include <ArduinoJson.h> //Load Json Library
 #include <Servo.h>
 
-Servo servo_lf;
-Servo servo_rt;
-Servo servo_up1;
-Servo servo_up2;
+Servo left;
+Servo right;
+Servo leftUp;
+Servo rightUp;
 
-int val; //variable for temperature reading
-int tempPin = A1;//define analog pin to read
-byte servoPin_rt= 22;
-byte servoPin_lf= 28;
-byte servoPin_up1 = 24;
-byte servoPin_up2 = 26;
+int val; // variable for temperature reading
+int tempPin = A1; // define analog pin to read
+byte leftServoPin= 22;
+byte rightServoPin = 28;
+byte leftUpServoPin = 24;
+byte rightUpServoPin = 26;
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);// initialize digital pin LED_BUILTIN as an output.
   digitalWrite(13,LOW);
   Serial.begin(9600);
-  servo_up1.attach(servoPin_up1);
-  servo_up2.attach(servoPin_up2);
-  servo_lf.attach(servoPin_lf);
-  servo_rt.attach(servoPin_rt);
-  delay(7000); //delay to allow ESC to recognize the stopped signal
+  left.attach(leftServoPin);
+  right.attach(rightServoPin);
+  leftUp.attach(leftUpServoPin);
+  rightUp.attach(rightUpServoPin);
+  delay(7000); // delay to allow ESC to recognize the stopped signal
 }
 
 void loop() {
   String thruster;
+  // Causes LED to flash if serial is unavailable.
   while (!Serial.available()){ 
-   //Serial.print("No data");
+   // Serial.print("No data");
    digitalWrite(13,HIGH);
    delay(100);
    digitalWrite(13,LOW);
    delay(100);
   }
   if(Serial.available()) {
-      thruster=Serial.readStringUntil( '\x7D' );//Read data from Arduino until};
-  
-    StaticJsonDocument<1000> json_doc; //the StaticJsonDocument we write to
-    deserializeJson(json_doc,thruster);
-     
-    //Left Thruster
-    float th_left=json_doc["tleft"];
-    int th_left_sig=(th_left+1)*400+1100; //map controller to servo
-    servo_lf.writeMicroseconds(th_left_sig); //Send signal to ESC
-    
-    //Right Thruster
-    float th_right=json_doc["tright"];
-    int th_right_sig=(th_right+1)*400+1100; //map controller to servo
-    servo_rt.writeMicroseconds(th_right_sig); //Send signal to ESC
-   
-    //Vertical Thruster 1 
-    float th_up_1 = json_doc["tup"];
-    int th_up_sig_1=(th_up_1+1)*400+1100; //map controller to servo
-    servo_up1.writeMicroseconds(th_up_sig_1); //Send signal to ESC
+    thruster = Serial.readStringUntil( '\x7D' ); // Read data from Arduino until }
+    StaticJsonDocument<1024> joystickData; //the StaticJsonDocument we write to
 
-    //Vertical Thruster 2
-    float th_up_2 = json_doc["tup"];
-    int th_up_sig_2=(th_up_1+1)*400+1100; //map controller to servo
-    servo_up2.writeMicroseconds(th_up_sig_2); //Send signal to ESC
+    deserializeJson(joystickData, thruster);
+    
+    float forwardBackwardPulseWidth = joystickData["forward_backward_pulsewidth"];
+    float leftPulseWidth = joystickData["left_pulsewidth"];
+    float rightPulseWidth = joystick_info["right_pulsewidth"];
+    float ascendDescendPulseWidth = joystick_info["ascent_descend_pulsewidth"];
+    float pitchLeftPulseWidth = joystick_info["pitch_left_pulsewidth"];
+    float pitchRightPulseWidth = joystick_info["pitch_right_pulsewidth"];
+
+    // Move forward/backward. Note, if other values are being written to left/right, then there might be issues.
+    left.writeMicroseconds(forwardBackwardPulseWidth);
+    right.writeMicroseconds(forwardBackwardPulseWidth);
+
+    // If not moving forward/backward, we can move left/right 
+    // Similarly, we can modify the code above so that if not moving left/right, we can move forward/backward
+    left.writeMicroseconds(leftPulseWidth);
+    right.writeMicroseconds(rightPulseWidth);
+
+    // ... similar issues may arise
+    // Vertical movement
+    leftUp.writeMicroseconds(ascendDescendPulseWidth);
+    rightUp.writeMicroseconds(ascendDescendPulseWidth);
+
+    // ... similar issues may arise
+    // Pitch
+    leftUp.writeMicroseconds(pitchLeftPulseWidth);
+    rightUp.writeMicroseconds(pitchRightPulseWidth);  
 
 //Read Temperature, return to surface
     val=analogRead(tempPin);//read arduino pin
