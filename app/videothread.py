@@ -55,7 +55,7 @@ class VideoThread(QThread):
             self.__display_width, self.__display_height, Qt.KeepAspectRatio)
         return QPixmap.fromImage(p)
 
-    def save_screenshot(self, path="../rov_images/"):
+    def save_screenshot(self, path="./rov_images/"):
         if not os.path.exists(path):
             os.mkdir(path)
 
