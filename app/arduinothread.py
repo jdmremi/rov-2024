@@ -98,6 +98,8 @@ class ArduinoThread(QThread):
                 port_filter = "/dev/cu.usb"
             case "Linux":
                 port_filter = "/dev/ttyACM"
+            case "Windows":
+                port_filter = "COM"
 
         # Filter ports based on the port filter
         filtered_ports = list(
