@@ -2,6 +2,7 @@ from PyQt5.QtCore import pyqtSignal, QThread, QTimer, pyqtSlot
 import pygame
 import logging
 import coloredlogs
+import _thread as thread
 
 coloredlogs.install(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -10,7 +11,7 @@ GREEN_TEXT_CSS = "color: green"
 RED_TEXT_CSS = "color: red"
 RESTING_PULSEWIDTH = 1500.00
 DEADZONE_MIN = 0.75
-PWM_DEADZONE_MIN = 0.25
+PWM_DEADZONE_MIN = 0.15
 
 
 class JoystickThread(QThread):
@@ -139,7 +140,7 @@ class JoystickThread(QThread):
 
             # Calculate the pulsewidths that need to be sent to the Arduino.
             pulsewidths = self.__calculate_pulsewidth(axis_info)
-            logger.debug("Pulsewidths: %s", pulsewidths)
+            # logger.debug("Pulsewidths: %s", pulsewidths)
 
             # Debug
             # logger.debug("left_thumbstick_left_right = %s",
@@ -166,7 +167,7 @@ class JoystickThread(QThread):
         }
             """
             joystick_info = {
-                "connected": True,
+                "connected": "True",
                 "joystickName": self.__joystick.get_name(),
                 "forward_backward_pulsewidth": pulsewidths["forward_backward_pulsewidth"],
                 "left_pulsewidth": pulsewidths["left_pulsewidth"],
@@ -182,8 +183,9 @@ class JoystickThread(QThread):
             # Rumble joystick
             self.__joystick.rumble(0, abs(rumble_freq), 1)
 
-            # Send data to Arduino
+            # Send data to Arduino on separate thread so that we don't have blocking issues.
             self.__arduino_thread.handle_data(joystick_info)
+            # logger.debug(joystick_info)
 
             # Emit joystick connection data to event handler
             self.joystick_change_signal.emit(joystick_info)
@@ -212,6 +214,10 @@ class JoystickThread(QThread):
     # 1900: Full forward thrust
 
     def __calculate_pulsewidth(self, axis_info):
+
+        for axis, value in axis_info.items():
+            # Reset to 1.0 if greater, reset to -1.0 if less than
+            pass
 
         left_thumbstick_left_right = axis_info["tLeft_LeftRight"]
         left_thumbstick_up_down = axis_info["tLeft_UpDown"]

@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QWidget, QApplication, QLabel, QHBoxLayout, QMainWin
 import logging
 import coloredlogs
 import sys
+import time
 
 # local
 from videowidget import VideoWidget
@@ -96,5 +97,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     screen = app.primaryScreen()
     a = Main(screen.size().width(), screen.size().height())
+    # So that our Arduino doesn't freak out
+    time.sleep(7.5)
     a.show()
     sys.exit(app.exec_())
