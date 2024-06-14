@@ -124,7 +124,7 @@ class JoystickThread(QThread):
             left_thumbstick_left_right = self.__joystick.get_axis(0)
             left_thumbstick_up_down = -self.__joystick.get_axis(1)
             right_thumbstick_left_right = self.__joystick.get_axis(2)
-            right_thumbstick_up_down = -self.__joystick.get_axis(3)
+            right_thumbstick_up_down = self.__joystick.get_axis(3)
 
             # Define a deadzone - This helps so that even the smallest of movements to the joystick don't cause sudden movement to the robot.
             if abs(left_thumbstick_left_right) < DEADZONE_MIN:

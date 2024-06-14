@@ -6,16 +6,12 @@ Servo right;
 Servo leftUp;
 Servo rightUp;
 
-// Holds read temperatures
-int temperature;
-// Pin 55 for temperature sensor 
-int temperaturePin = A1; 
 // Pin for left forward-facing servo 
-byte leftServoPin= 22; 
+byte leftServoPin= 26; 
 // Pin for right forward-facing servo
 byte rightServoPin = 24;
 // Pin for left upward-facing servo
-byte leftUpServoPin = 26; 
+byte leftUpServoPin = 22; 
 // Pin for right upward-facing servo
 byte rightUpServoPin = 28;
 
@@ -29,7 +25,6 @@ void setup() {
   digitalWrite(LED_BUILTIN, LOW);
    // Set baudrate to 9600
   Serial.begin(9600);
-
   // Attach the Servos to pins
   left.attach(leftServoPin);
   right.attach(rightServoPin);
@@ -40,13 +35,11 @@ void setup() {
   delay(7000); 
   // Turn on LED after initializing
   digitalWrite(LED_BUILTIN, HIGH);
-  
 }
 
 void loop() {
     static bool messageComplete = false;
     static int index = 0;
-
     if (Serial.available() > 0) {
         char receivedChar = Serial.read();
 
@@ -80,7 +73,7 @@ void loop() {
                 int ascendDescendPulsewidth = axisInfo[3];
                 int pitchLeftPulsewidth = axisInfo[4];
                 int pitchRightPulsewidth = axisInfo[5];
-                /*
+                
                 // If there's no forward/backward movement, then we can move left (since both are handled by left/right motors)
                 if(forwardBackwardPulsewidth == 1500) {
                   left.writeMicroseconds(leftPulsewidth);
@@ -96,17 +89,12 @@ void loop() {
                 } else {
                   leftUp.writeMicroseconds(ascendDescendPulsewidth);
                   rightUp.writeMicroseconds(ascendDescendPulsewidth);
-                }*/
-
-                temperature = analogRead(temperaturePin);
-                // 5 volts = 1024 bytes (?)
-                float mV = ((temperature/1024.0)*500);
-                // Temperature in Celsius
-                float celsius = (mV/10); 
-                out["temp"] = temperature;
-                out["volt"] = mV;
+                }                
+                // DHT11 sensor provides humidity value in percentage in relative humidity (20 to 90% RH) and temperature values in degree Celsius (0 to 50 °C).
+                // DHT11 sensor uses resistive humidity measurement component, and NTC temperature measurement component.
+                // out["humidity"] = humidity;
+                // out["temperature"] = temperature;
                 out["axisInfo"] = axisInfo;
-            
                 // Convert to Json string, send data to surface (Python).
                 serializeJson(out,Serial);
                 // Small delay

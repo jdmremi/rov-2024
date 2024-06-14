@@ -136,6 +136,9 @@ class ArduinoThread(QThread):
         # logger.debug(f"Queueing data to send to Arduino: {data}")
         self.write_queue.put(data)  # Put data in the queue
 
+        # If queue becomes too big (> 1000), we might need to clear it.
+        # logger.debug(f"Queue size: {self.write_queue.qsize()}")
+
     # Slot to forward data read from Arduino to the main application
     @pyqtSlot(dict)
     def forward_arduino_data(self, data):

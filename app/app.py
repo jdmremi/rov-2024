@@ -42,8 +42,8 @@ class Main(QMainWindow):
         self.__status_bar = QStatusBar()
         self.__status_bar_widgets = {
             "joystickStatus": QLabel("Joystick status: Disconnected"),
-            "arduinoTemperature": QLabel(text="Arduino Temperature: 0.00°C"),
-            "arduinoVoltage": QLabel(text="Arduino Voltage: 0.00V"),
+            # "arduinoTemperature": QLabel(text="Arduino Temperature: 0.00°C"),
+            # "arduinoHumidity": QLabel(text="Humidity: 0.00% RH"),
             "clawStatus": QLabel(text="Claw status: Open/Closed..."),
             "forwardBackwardThrustStatusLabel": QLabel(),
             "leftRightThrustStatusLabel": QLabel(),
@@ -85,14 +85,16 @@ class Main(QMainWindow):
 
     def update_arduino_status(self, data):
         # Update the status bar with data from the Arduino
-        temperature = data.get('temp', 0.0)
-        voltage = data.get('volt', 0.0)
+        """
+        temperature = data.get("temp", 0.0)
+        humidity = data.get("humidity", 0.0)
         logger.debug(
-            f"Received data - Temperature: {temperature}, Voltage: {voltage}")
+            f"Received data - Temperature: {temperature}, Humidity: {humidity}%")
         self.__status_bar_widgets.get("arduinoTemperature").setText(
-            f"Arduino Temperature: {temperature:.2f}°C")
-        self.__status_bar_widgets.get("arduinoVoltage").setText(
-            f"Arduino Voltage: {voltage:.2f}V")
+            f"Temperature: {temperature:.2f}°C")
+        self.__status_bar_widgets.get("arduinoHumidity").setText(
+            f"Humidity: {humidity:.2f}%")
+        """
 
 
 if __name__ == "__main__":
