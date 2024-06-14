@@ -1,4 +1,4 @@
-#include <ArduinoJson.h> //Load Json Library
+#include <ArduinoJson.h>
 #include <Servo.h>
 
 Servo left;
@@ -6,81 +6,114 @@ Servo right;
 Servo leftUp;
 Servo rightUp;
 
-int val; // variable for temperature reading
-int tempPin = A1; // define analog pin to read
-byte leftServoPin= 22;
-byte rightServoPin = 28;
-byte leftUpServoPin = 24;
-byte rightUpServoPin = 26;
+// Holds read temperatures
+int temperature;
+// Pin 55 for temperature sensor 
+int temperaturePin = A1; 
+// Pin for left forward-facing servo 
+byte leftServoPin= 22; 
+// Pin for right forward-facing servo
+byte rightServoPin = 24;
+// Pin for left upward-facing servo
+byte leftUpServoPin = 26; 
+// Pin for right upward-facing servo
+byte rightUpServoPin = 28;
+
+const int MAX_BUFFER_SIZE = 512;
+char jsonBuffer[MAX_BUFFER_SIZE];
 
 void setup() {
-  pinMode(LED_BUILTIN, OUTPUT);// initialize digital pin LED_BUILTIN as an output.
-  digitalWrite(13,LOW);
+  // Initialize digital pin LED_BUILTIN as an output.
+  pinMode(LED_BUILTIN, OUTPUT);
+   // Turn off LED if previously turned on
+  digitalWrite(LED_BUILTIN, LOW);
+   // Set baudrate to 9600
   Serial.begin(9600);
+
+  // Attach the Servos to pins
   left.attach(leftServoPin);
   right.attach(rightServoPin);
   leftUp.attach(leftUpServoPin);
   rightUp.attach(rightUpServoPin);
-  delay(7000); // delay to allow ESC to recognize the stopped signal
+
+  // delay to allow ESC to recognize the stopped signal
+  delay(7000); 
+  // Turn on LED after initializing
+  digitalWrite(LED_BUILTIN, HIGH);
+  
 }
 
 void loop() {
-  String thruster;
-  // Causes LED to flash if serial is unavailable.
-  while (!Serial.available()){ 
-   // Serial.print("No data");
-   digitalWrite(13,HIGH);
-   delay(100);
-   digitalWrite(13,LOW);
-   delay(100);
-  }
-  if(Serial.available()) {
-    thruster = Serial.readStringUntil( '\x7D' ); // Read data from Arduino until }
-    StaticJsonDocument<1024> joystickData; //the StaticJsonDocument we write to
+    static bool messageComplete = false;
+    static int index = 0;
 
-    deserializeJson(joystickData, thruster);
-    
-    float forwardBackwardPulseWidth = joystickData["forward_backward_pulsewidth"];
-    float leftPulseWidth = joystickData["left_pulsewidth"];
-    float rightPulseWidth = joystick_info["right_pulsewidth"];
-    float ascendDescendPulseWidth = joystick_info["ascent_descend_pulsewidth"];
-    float pitchLeftPulseWidth = joystick_info["pitch_left_pulsewidth"];
-    float pitchRightPulseWidth = joystick_info["pitch_right_pulsewidth"];
+    if (Serial.available() > 0) {
+        char receivedChar = Serial.read();
 
-    // Move forward/backward. Note, if other values are being written to left/right, then there might be issues.
-    left.writeMicroseconds(forwardBackwardPulseWidth);
-    right.writeMicroseconds(forwardBackwardPulseWidth);
+        // If we come across our null-terminator
+        if (receivedChar == '\0') {
+            // Null-terminate the buffer
+            jsonBuffer[index] = '\0'; 
+            // Reset index for next message
+            index = 0;
+            messageComplete = true;
+        } else {
+            // Add character to buffer if there's space
+            if (index < MAX_BUFFER_SIZE - 1) {
+                jsonBuffer[index++] = receivedChar;
+            }
+        }
 
-    // If not moving forward/backward, we can move left/right 
-    // Similarly, we can modify the code above so that if not moving left/right, we can move forward/backward
-    left.writeMicroseconds(leftPulseWidth);
-    right.writeMicroseconds(rightPulseWidth);
+        // Process JSON message if complete. jsonBuffer will contain all data.
+        if (messageComplete) {
+            StaticJsonDocument<MAX_BUFFER_SIZE> doc;
+            StaticJsonDocument<MAX_BUFFER_SIZE> out;
+            DeserializationError error = deserializeJson(doc, jsonBuffer);
+            if (error) {
+                Serial.print("Error parsing JSON: ");
+                Serial.println(error.c_str());
+            } else {
+                JsonArray axisInfo = doc["axisInfo"];
+                int forwardBackwardPulsewidth = axisInfo[0];
+                int leftPulsewidth = axisInfo[1];
+                int rightPulsewidth = axisInfo[2];
+                int ascendDescendPulsewidth = axisInfo[3];
+                int pitchLeftPulsewidth = axisInfo[4];
+                int pitchRightPulsewidth = axisInfo[5];
+                /*
+                // If there's no forward/backward movement, then we can move left (since both are handled by left/right motors)
+                if(forwardBackwardPulsewidth == 1500) {
+                  left.writeMicroseconds(leftPulsewidth);
+                  right.writeMicroseconds(rightPulsewidth);
+                } else {
+                  left.writeMicroseconds(forwardBackwardPulsewidth);
+                  right.writeMicroseconds(forwardBackwardPulsewidth);
+                }
 
-    // ... similar issues may arise
-    // Vertical movement
-    leftUp.writeMicroseconds(ascendDescendPulseWidth);
-    rightUp.writeMicroseconds(ascendDescendPulseWidth);
+                if(ascendDescendPulsewidth == 1500) {
+                  leftUp.writeMicroseconds(pitchLeftPulsewidth);
+                  rightUp.writeMicroseconds(pitchRightPulsewidth);  
+                } else {
+                  leftUp.writeMicroseconds(ascendDescendPulsewidth);
+                  rightUp.writeMicroseconds(ascendDescendPulsewidth);
+                }*/
 
-    // ... similar issues may arise
-    // Pitch
-    leftUp.writeMicroseconds(pitchLeftPulseWidth);
-    rightUp.writeMicroseconds(pitchRightPulseWidth);  
-
-//Read Temperature, return to surface
-    val=analogRead(tempPin);//read arduino pin
-    StaticJsonDocument<500> doc;//define StaticJsonDocument
-    float mv = ((val/1024.0)*500);
-    float cel = (mv/10);//temperature in Celsius
-    doc["temp"]=cel;//add temp to StaticJsonDocument
-    doc["volt"]=mv;
-    doc["sig_up_1"]=th_up_sig_1;
-    doc["sig_up_2"]=th_up_sig_2;
-    doc["sig_rt"]=th_right_sig;
-    doc["sig_lf"]=th_left_sig;
- 
-    serializeJson(doc,Serial);//convert to Json string,sends to surface
-    Serial.println();//newline
-    delay(10);
-  }
+                temperature = analogRead(temperaturePin);
+                // 5 volts = 1024 bytes (?)
+                float mV = ((temperature/1024.0)*500);
+                // Temperature in Celsius
+                float celsius = (mV/10); 
+                out["temp"] = temperature;
+                out["volt"] = mV;
+                out["axisInfo"] = axisInfo;
+            
+                // Convert to Json string, send data to surface (Python).
+                serializeJson(out,Serial);
+                // Small delay
+                delay(100);
+                Serial.println();
+            }
+            messageComplete = false;
+        }
+    }
 }
-    

@@ -48,14 +48,12 @@ class ArduinoWriteWorker(QObject):
                 data = self.queue.get()  # Get data from the queue
                 try:
                     # Convert data to JSON format and send to Arduino
-                    payload = json.dumps(data)
+                    payload = json.dumps(data) + '\0'
                     # logger.debug(f"Sending payload to Arduino: {payload}")
                     self.serial_port.write(bytes(payload, 'utf-8'))
                     self.serial_port.flush()
                 except Exception as e:
                     logger.critical(f"Error writing to Arduino: {e}")
-            else:
-                logger.debug("Queue is empty")
             time.sleep(0.1)  # Small delay to avoid busy waiting
 
 

@@ -3,6 +3,7 @@ import pygame
 import logging
 import coloredlogs
 import _thread as thread
+import time
 
 coloredlogs.install(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -12,6 +13,7 @@ RED_TEXT_CSS = "color: red"
 RESTING_PULSEWIDTH = 1500.00
 DEADZONE_MIN = 0.75
 PWM_DEADZONE_MIN = 0.15
+ARDUINO_SEND_TIMER_MIN = 0.1
 
 
 class JoystickThread(QThread):
@@ -36,6 +38,9 @@ class JoystickThread(QThread):
         # References to Arduino and video threads.
         self.__arduino_thread = arduino_thread
         self.__video_thread = video_thread
+
+        # Holds interval in which data is sent to arduino
+        self.__last_sent_time = time.time()
 
         # Initialize pygame so that its libraries can be used.
         pygame.init()
@@ -91,7 +96,7 @@ class JoystickThread(QThread):
     @pyqtSlot(dict)
     def handle_joystick(self, commands):
         # Contains True/False depending on whether or not a joystick is connected.
-        is_joystick_connected = commands["connected"]
+        is_joystick_connected = commands.get("connected")
         # If False, then the joystick has been disconnected.
         if not is_joystick_connected:
             logger.warn("Joystick disconnected")
@@ -169,12 +174,24 @@ class JoystickThread(QThread):
             joystick_info = {
                 "connected": "True",
                 "joystickName": self.__joystick.get_name(),
-                "forward_backward_pulsewidth": pulsewidths["forward_backward_pulsewidth"],
-                "left_pulsewidth": pulsewidths["left_pulsewidth"],
-                "right_pulsewidth": pulsewidths["right_pulsewidth"],
-                "ascend_descend_pulsewidth": pulsewidths["ascend_descend_pulsewidth"],
-                "pitch_left_pulsewidth": pulsewidths["pitch_left_pulsewidth"],
-                "pitch_right_pulsewidth": pulsewidths["pitch_right_pulsewidth"]
+                "axisInfo": [
+                    pulsewidths.get("forward_backward_pulsewidth"),
+                    pulsewidths.get("left_pulsewidth"),
+                    pulsewidths.get("right_pulsewidth"),
+                    pulsewidths.get("ascend_descend_pulsewidth"),
+                    pulsewidths.get("pitch_left_pulsewidth"),
+                    pulsewidths.get("pitch_right_pulsewidth")
+                ]
+            }
+            to_arduino = {
+                "axisInfo": [
+                    pulsewidths.get("forward_backward_pulsewidth"),
+                    pulsewidths.get("left_pulsewidth"),
+                    pulsewidths.get("right_pulsewidth"),
+                    pulsewidths.get("ascend_descend_pulsewidth"),
+                    pulsewidths.get("pitch_left_pulsewidth"),
+                    pulsewidths.get("pitch_right_pulsewidth")
+                ]
             }
             # Determine the rumble frequency for the joystick.
             # Finds the highest value out of all of the joystick thumbstick axes to determine rumble frequency.
@@ -184,7 +201,12 @@ class JoystickThread(QThread):
             self.__joystick.rumble(0, abs(rumble_freq), 1)
 
             # Send data to Arduino on separate thread so that we don't have blocking issues.
-            self.__arduino_thread.handle_data(joystick_info)
+            # We can only send data every ARDUINO_SEND_TIMER_MIN seconds so that the Arduino can process the data correctly.
+            current_time = time.time()
+            if current_time - self.__last_sent_time > ARDUINO_SEND_TIMER_MIN:
+                self.__arduino_thread.handle_data(to_arduino)
+                self.__last_sent_time = current_time
+            # self.__arduino_thread.handle_data(joystick_info)
             # logger.debug(joystick_info)
 
             # Emit joystick connection data to event handler
@@ -214,15 +236,10 @@ class JoystickThread(QThread):
     # 1900: Full forward thrust
 
     def __calculate_pulsewidth(self, axis_info):
-
-        for axis, value in axis_info.items():
-            # Reset to 1.0 if greater, reset to -1.0 if less than
-            pass
-
-        left_thumbstick_left_right = axis_info["tLeft_LeftRight"]
-        left_thumbstick_up_down = axis_info["tLeft_UpDown"]
-        right_thumbstick_left_right = axis_info["tRight_LeftRight"]
-        right_thumbstick_up_down = axis_info["tRight_UpDown"]
+        left_thumbstick_left_right = axis_info.get("tLeft_LeftRight")
+        left_thumbstick_up_down = axis_info.get("tLeft_UpDown")
+        right_thumbstick_left_right = axis_info.get("tRight_LeftRight")
+        right_thumbstick_up_down = axis_info.get("tRight_UpDown")
 
         # Default should be 1500 (no movement)
         forward_backward_pulsewidth = RESTING_PULSEWIDTH
@@ -336,12 +353,12 @@ class JoystickThread(QThread):
         left_right_thrust_label_text = None
         pitch_thrust_label_text = None
 
-        fb_pw = pulsewidths["forward_backward_pulsewidth"]
-        v_pw = pulsewidths["ascend_descend_pulsewidth"]
-        l_pw = pulsewidths["left_pulsewidth"]
-        r_pw = pulsewidths["right_pulsewidth"]
-        pl_pw = pulsewidths["pitch_left_pulsewidth"]
-        pr_pw = pulsewidths["pitch_right_pulsewidth"]
+        fb_pw = pulsewidths.get("forward_backward_pulsewidth")
+        v_pw = pulsewidths.get("ascend_descend_pulsewidth")
+        l_pw = pulsewidths.get("left_pulsewidth")
+        r_pw = pulsewidths.get("right_pulsewidth")
+        pl_pw = pulsewidths.get("pitch_left_pulsewidth")
+        pr_pw = pulsewidths.get("pitch_right_pulsewidth")
 
         # Reverse thrust (< 1500)
         if fb_pw < 1500:

@@ -1,4 +1,5 @@
-from PyQt5.QtWidgets import QWidget, QApplication, QLabel, QHBoxLayout, QMainWindow, QStatusBar, QProgressBar
+from PyQt5.QtWidgets import QWidget, QApplication, QLabel, QHBoxLayout, QMainWindow, QStatusBar
+from PyQt5.QtGui import QIcon
 import logging
 import coloredlogs
 import sys
@@ -13,6 +14,7 @@ WINDOW_TITLE = "ROV Control"
 GREEN_TEXT_CSS = "color: green"
 RED_TEXT_CSS = "color: red"
 YELLOW_TEXT_CSS = "color: yellow"
+ICON_PATH = "./assets/logo.png"
 
 coloredlogs.install(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -87,14 +89,16 @@ class Main(QMainWindow):
         voltage = data.get('volt', 0.0)
         logger.debug(
             f"Received data - Temperature: {temperature}, Voltage: {voltage}")
-        self.__status_bar_widgets["arduinoTemperature"].setText(
+        self.__status_bar_widgets.get("arduinoTemperature").setText(
             f"Arduino Temperature: {temperature:.2f}°C")
-        self.__status_bar_widgets["arduinoVoltage"].setText(
+        self.__status_bar_widgets.get("arduinoVoltage").setText(
             f"Arduino Voltage: {voltage:.2f}V")
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon(ICON_PATH))
+    app.setApplicationName(WINDOW_TITLE)
     screen = app.primaryScreen()
     a = Main(screen.size().width(), screen.size().height())
     # So that our Arduino doesn't freak out
