@@ -1,79 +1,107 @@
-#include <ArduinoJson.h> //Load Json Library
+#include <ArduinoJson.h>
 #include <Servo.h>
 
-Servo servo_lf;
-Servo servo_rt;
-Servo servo_up1;
-Servo servo_up2;
+Servo left;
+Servo right;
+Servo leftUp;
+Servo rightUp;
 
-int val; //variable for temperature reading
-int tempPin = A1;//define analog pin to read
-byte servoPin_rt= 22;
-byte servoPin_lf= 28;
-byte servoPin_up1 = 24;
-byte servoPin_up2 = 26;
+// Pin for left forward-facing servo 
+byte leftServoPin= 26; 
+// Pin for right forward-facing servo
+byte rightServoPin = 24;
+// Pin for left upward-facing servo
+byte leftUpServoPin = 22; 
+// Pin for right upward-facing servo
+byte rightUpServoPin = 28;
+
+const int MAX_BUFFER_SIZE = 512;
+char jsonBuffer[MAX_BUFFER_SIZE];
 
 void setup() {
-  pinMode(LED_BUILTIN, OUTPUT);// initialize digital pin LED_BUILTIN as an output.
-  digitalWrite(13,LOW);
+  // Initialize digital pin LED_BUILTIN as an output.
+  pinMode(LED_BUILTIN, OUTPUT);
+   // Turn off LED if previously turned on
+  digitalWrite(LED_BUILTIN, LOW);
+   // Set baudrate to 9600
   Serial.begin(9600);
-  servo_up1.attach(servoPin_up1);
-  servo_up2.attach(servoPin_up2);
-  servo_lf.attach(servoPin_lf);
-  servo_rt.attach(servoPin_rt);
-  delay(7000); //delay to allow ESC to recognize the stopped signal
+  // Attach the Servos to pins
+  left.attach(leftServoPin);
+  right.attach(rightServoPin);
+  leftUp.attach(leftUpServoPin);
+  rightUp.attach(rightUpServoPin);
+
+  // delay to allow ESC to recognize the stopped signal
+  delay(7000); 
+  // Turn on LED after initializing
+  digitalWrite(LED_BUILTIN, HIGH);
 }
 
 void loop() {
-  String thruster;
-  while (!Serial.available()){ 
-   //Serial.print("No data");
-   digitalWrite(13,HIGH);
-   delay(100);
-   digitalWrite(13,LOW);
-   delay(100);
-  }
-  if(Serial.available()) {
-      thruster=Serial.readStringUntil( '\x7D' );//Read data from Arduino until};
-  
-    StaticJsonDocument<1000> json_doc; //the StaticJsonDocument we write to
-    deserializeJson(json_doc,thruster);
-     
-    //Left Thruster
-    float th_left=json_doc["tleft"];
-    int th_left_sig=(th_left+1)*400+1100; //map controller to servo
-    servo_lf.writeMicroseconds(th_left_sig); //Send signal to ESC
-    
-    //Right Thruster
-    float th_right=json_doc["tright"];
-    int th_right_sig=(th_right+1)*400+1100; //map controller to servo
-    servo_rt.writeMicroseconds(th_right_sig); //Send signal to ESC
-   
-    //Vertical Thruster 1 
-    float th_up_1 = json_doc["tup"];
-    int th_up_sig_1=(th_up_1+1)*400+1100; //map controller to servo
-    servo_up1.writeMicroseconds(th_up_sig_1); //Send signal to ESC
+    static bool messageComplete = false;
+    static int index = 0;
+    if (Serial.available() > 0) {
+        char receivedChar = Serial.read();
 
-    //Vertical Thruster 2
-    float th_up_2 = json_doc["tup"];
-    int th_up_sig_2=(th_up_1+1)*400+1100; //map controller to servo
-    servo_up2.writeMicroseconds(th_up_sig_2); //Send signal to ESC
+        // If we come across our null-terminator
+        if (receivedChar == '\0') {
+            // Null-terminate the buffer
+            jsonBuffer[index] = '\0'; 
+            // Reset index for next message
+            index = 0;
+            messageComplete = true;
+        } else {
+            // Add character to buffer if there's space
+            if (index < MAX_BUFFER_SIZE - 1) {
+                jsonBuffer[index++] = receivedChar;
+            }
+        }
 
-//Read Temperature, return to surface
-    val=analogRead(tempPin);//read arduino pin
-    StaticJsonDocument<500> doc;//define StaticJsonDocument
-    float mv = ((val/1024.0)*500);
-    float cel = (mv/10);//temperature in Celsius
-    doc["temp"]=cel;//add temp to StaticJsonDocument
-    doc["volt"]=mv;
-    doc["sig_up_1"]=th_up_sig_1;
-    doc["sig_up_2"]=th_up_sig_2;
-    doc["sig_rt"]=th_right_sig;
-    doc["sig_lf"]=th_left_sig;
- 
-    serializeJson(doc,Serial);//convert to Json string,sends to surface
-    Serial.println();//newline
-    delay(10);
-  }
+        // Process JSON message if complete. jsonBuffer will contain all data.
+        if (messageComplete) {
+            StaticJsonDocument<MAX_BUFFER_SIZE> doc;
+            StaticJsonDocument<MAX_BUFFER_SIZE> out;
+            DeserializationError error = deserializeJson(doc, jsonBuffer);
+            if (error) {
+                Serial.print("Error parsing JSON: ");
+                Serial.println(error.c_str());
+            } else {
+                JsonArray axisInfo = doc["axisInfo"];
+                int forwardBackwardPulsewidth = axisInfo[0];
+                int leftPulsewidth = axisInfo[1];
+                int rightPulsewidth = axisInfo[2];
+                int ascendDescendPulsewidth = axisInfo[3];
+                int pitchLeftPulsewidth = axisInfo[4];
+                int pitchRightPulsewidth = axisInfo[5];
+                
+                // If there's no forward/backward movement, then we can move left (since both are handled by left/right motors)
+                if(forwardBackwardPulsewidth == 1500) {
+                  left.writeMicroseconds(leftPulsewidth);
+                  right.writeMicroseconds(rightPulsewidth);
+                } else {
+                  left.writeMicroseconds(forwardBackwardPulsewidth);
+                  right.writeMicroseconds(forwardBackwardPulsewidth);
+                }
+
+                if(ascendDescendPulsewidth == 1500) {
+                  leftUp.writeMicroseconds(pitchLeftPulsewidth);
+                  rightUp.writeMicroseconds(pitchRightPulsewidth);  
+                } else {
+                  leftUp.writeMicroseconds(ascendDescendPulsewidth);
+                  rightUp.writeMicroseconds(ascendDescendPulsewidth);
+                }                
+                // DHT11 sensor provides humidity value in percentage in relative humidity (20 to 90% RH) and temperature values in degree Celsius (0 to 50 °C).
+                // DHT11 sensor uses resistive humidity measurement component, and NTC temperature measurement component.
+                // out["humidity"] = humidity;
+                // out["temperature"] = temperature;
+                out["axisInfo"] = axisInfo;
+                // Convert to Json string, send data to surface (Python).
+                serializeJson(out,Serial);
+                // Small delay
+                delay(100);
+                Serial.println();
+            }
+            messageComplete = false;
+        }
+    }
 }
-    

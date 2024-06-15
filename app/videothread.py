@@ -55,10 +55,11 @@ class VideoThread(QThread):
             self.__display_width, self.__display_height, Qt.KeepAspectRatio)
         return QPixmap.fromImage(p)
 
-    def save_screenshot(self, path="../rov_images/"):
+    def save_screenshot(self, path="./rov_images/"):
         if not os.path.exists(path):
             os.mkdir(path)
 
+        # Generate random file name
         if self.__recent_frame is not None:
             file_name = ''.join(random.SystemRandom().choice(
                 string.ascii_uppercase + string.digits) for _ in range(6))
