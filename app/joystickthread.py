@@ -344,7 +344,7 @@ class JoystickThread(QThread):
         if val >= -PWM_DEADZONE_MIN and val <= PWM_DEADZONE_MIN:
             return 1500
         else:
-            return 400*(val + 1) + 1100
+            return 400*(val + 1) + 1000
 
     def __update_thrust_labels(self, pulsewidths):
         # If forward thrust (pw > 1500): say direction is forward with thrust percentage
