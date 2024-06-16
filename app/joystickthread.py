@@ -113,18 +113,20 @@ class JoystickThread(QThread):
             # If you are not using other event functions in your game, you should call pygame.event.pump() to allow pygame to handle internal actions."
             pygame.event.pump()
 
+            # Flip the signs of some values so that up on the left thumbstick corresponds to positive forward thrust, etc...
+            left_thumbstick_left_right = self.__joystick.get_axis(0)
+            left_thumbstick_up_down = -self.__joystick.get_axis(1)
+            right_thumbstick_left_right = self.__joystick.get_axis(2)
+            right_thumbstick_up_down = self.__joystick.get_axis(3)
+            left_trigger = self.__joystick.get_axis(4)
+            right_trigger = self.__joystick.get_axis(5)
+
             # Miscellaneous button press handlers
             for event in pygame.event.get():
                 # Screenshots
                 if event.type == pygame.JOYBUTTONDOWN and event.button == 4:
                     self.__video_thread.save_screenshot()
                 # Todo: Implement claw functionality
-
-            # Flip the signs of all values so that up on the left thumbstick corresponds to positive forward thrust, etc...
-            left_thumbstick_left_right = self.__joystick.get_axis(0)
-            left_thumbstick_up_down = -self.__joystick.get_axis(1)
-            right_thumbstick_left_right = self.__joystick.get_axis(2)
-            right_thumbstick_up_down = self.__joystick.get_axis(3)
 
             # Define a deadzone - This helps so that even the smallest of movements to the joystick don't cause sudden movement to the robot.
             if abs(left_thumbstick_left_right) < DEADZONE_MIN:
@@ -135,6 +137,12 @@ class JoystickThread(QThread):
                 right_thumbstick_left_right = 0
             if abs(right_thumbstick_up_down) < DEADZONE_MIN:
                 right_thumbstick_up_down = 0
+
+            # Define deadzones for the triggers too - they may be sensitive.
+            if abs(left_trigger) < DEADZONE_MIN:
+                left_trigger = 0
+            if abs(right_trigger) < DEADZONE_MIN:
+                right_trigger = 0
 
             axis_info = {
                 "tLeft_LeftRight": left_thumbstick_left_right,
@@ -190,7 +198,9 @@ class JoystickThread(QThread):
                     pulsewidths.get("right_pulsewidth"),
                     pulsewidths.get("ascend_descend_pulsewidth"),
                     pulsewidths.get("pitch_left_pulsewidth"),
-                    pulsewidths.get("pitch_right_pulsewidth")
+                    pulsewidths.get("pitch_right_pulsewidth"),
+                    left_trigger,
+                    right_trigger
                 ]
             }
             # Determine the rumble frequency for the joystick.
