@@ -206,7 +206,7 @@ class JoystickThread(QThread):
             # Determine the rumble frequency for the joystick.
             # Finds the highest value out of all of the joystick thumbstick axes to determine rumble frequency.
             rumble_freq = max(abs(left_thumbstick_left_right), abs(left_thumbstick_up_down), abs(
-                right_thumbstick_left_right), abs(right_thumbstick_up_down))
+                right_thumbstick_left_right), abs(right_thumbstick_up_down), abs(left_trigger), abs(right_trigger))
             # Rumble joystick
             self.__joystick.rumble(0, abs(rumble_freq), 1)
 
