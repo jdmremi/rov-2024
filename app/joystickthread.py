@@ -206,7 +206,7 @@ class JoystickThread(QThread):
             # Determine the rumble frequency for the joystick.
             # Finds the highest value out of all of the joystick thumbstick axes to determine rumble frequency.
             rumble_freq = max(abs(left_thumbstick_left_right), abs(left_thumbstick_up_down), abs(
-                right_thumbstick_left_right), abs(right_thumbstick_up_down), abs(left_trigger), abs(right_trigger))
+                right_thumbstick_left_right), abs(right_thumbstick_up_down))
             # Rumble joystick
             self.__joystick.rumble(0, abs(rumble_freq), 1)
 
@@ -354,8 +354,7 @@ class JoystickThread(QThread):
         if val >= -PWM_DEADZONE_MIN and val <= PWM_DEADZONE_MIN:
             return 1500
         else:
-            # return 400*(val + 1) + 1000
-            return (300*val) + 1500
+            return 400*(val + 1) + 1100
 
     def __update_thrust_labels(self, pulsewidths):
         # If forward thrust (pw > 1500): say direction is forward with thrust percentage
