@@ -17,7 +17,55 @@ ARDUINO_SEND_TIMER_MIN = 0.1
 
 
 class JoystickThread(QThread):
+    """
+    JoystickThread is a PyQt QThread that handles joystick input and interaction with the GUI, Arduino, and video threads.
 
+    This thread is responsible for:
+    - Detecting joystick connections and disconnections.
+    - Reading joystick input and mapping it to pulsewidth values for controlling a robot.
+    - Updating GUI elements to reflect joystick input and connection status.
+    - Sending joystick data to an Arduino for controlling the robot.
+    - Handling joystick events such as button presses for additional functionality (e.g., taking screenshots).
+
+    Attributes:
+        joystick_change_signal (pyqtSignal): Signal emitted when joystick connection status or input changes.
+        __run_flag (bool): Flag to control the thread's execution.
+        __joystick (pygame.joystick.Joystick): The currently connected joystick.
+        __forward_backward_thrust_label (QLabel): GUI label for forward/backward thrust.
+        __left_right_thrust_label (QLabel): GUI label for left/right thrust.
+        __vertical_thrust_label (QLabel): GUI label for vertical thrust.
+        __pitch_thrust_label (QLabel): GUI label for pitch thrust.
+        __connection_status_bar (QLabel): GUI label for joystick connection status.
+        __arduino_thread (QThread): Thread for communicating with the Arduino.
+        __video_thread (QThread): Thread for handling video-related functionality.
+        __last_sent_time (float): Timestamp of the last data sent to the Arduino.
+        _wait_for_joystick_timer (QTimer): Timer to periodically check for joystick connections.
+        __joystick_timer (QTimer): Timer to periodically check joystick input.
+        RESTING_PULSEWIDTH (int): Default pulsewidth value when no movement is detected.
+        DEADZONE_MIN (float): Minimum joystick movement threshold to avoid unintentional drift.
+        PWM_DEADZONE_MIN (float): Minimum pulsewidth threshold to avoid unintentional drift.
+        ARDUINO_SEND_TIMER_MIN (float): Minimum interval between data transmissions to the Arduino.
+
+    Methods:
+        __init__(forward_backward_thrust_label, left_right_thrust_label, vertical_thrust_label, pitch_thrust_label, status_bar, arduino_thread, video_thread):
+            Initializes the JoystickThread and its attributes.
+        stop():
+            Stops the thread and waits for it to finish.
+        _wait_for_joystick():
+            Handles joystick reconnections by reinitializing pygame and checking for connected joysticks.
+        _initialize_joystick():
+            Initializes the first connected joystick and updates the GUI.
+        handle_joystick(commands):
+            Slot to handle joystick connection status changes.
+        check_joystick_input():
+            Reads joystick input, processes it, updates the GUI, and sends data to the Arduino.
+        __calculate_pulsewidth(axis_info):
+            Maps joystick axis values to pulsewidth values for controlling the robot.
+        __map_to_pwm(val):
+            Maps a joystick axis value to a PWM pulsewidth, applying a deadzone to avoid drift.
+        __update_thrust_labels(pulsewidths):
+            Updates the GUI labels to reflect the current thrust values based on pulsewidths.
+    """
     # This signal is used to fire events related to joystick changes.
     joystick_change_signal = pyqtSignal(dict)
 
@@ -25,6 +73,35 @@ class JoystickThread(QThread):
     # Also takes in the video thread to take screenshots.
     # Also takes in the arduino thread to send data to the arduino.
     def __init__(self, forward_backward_thrust_label, left_right_thrust_label, vertical_thrust_label, pitch_thrust_label, status_bar, arduino_thread, video_thread):
+        """
+        Initializes the JoystickThread class.
+
+        Args:
+            forward_backward_thrust_label (QLabel): Label to display forward/backward thrust values.
+            left_right_thrust_label (QLabel): Label to display left/right thrust values.
+            vertical_thrust_label (QLabel): Label to display vertical thrust values.
+            pitch_thrust_label (QLabel): Label to display pitch thrust values.
+            status_bar (QStatusBar): Status bar to display connection status.
+            arduino_thread (QThread): Reference to the Arduino communication thread.
+            video_thread (QThread): Reference to the video processing thread.
+
+        Attributes:
+            __run_flag (bool): Flag to control the thread's execution.
+            __joystick (pygame.joystick.Joystick): Reference to the connected joystick.
+            __forward_backward_thrust_label (QLabel): GUI label for forward/backward thrust.
+            __left_right_thrust_label (QLabel): GUI label for left/right thrust.
+            __vertical_thrust_label (QLabel): GUI label for vertical thrust.
+            __pitch_thrust_label (QLabel): GUI label for pitch thrust.
+            __connection_status_bar (QStatusBar): GUI status bar for connection status.
+            __arduino_thread (QThread): Reference to the Arduino communication thread.
+            __video_thread (QThread): Reference to the video processing thread.
+            __last_sent_time (float): Timestamp of the last data sent to Arduino.
+            _wait_for_joystick_timer (QTimer): Timer to periodically check for joystick connection.
+            __joystick_timer (QTimer): Timer to handle joystick input and disconnection checks.
+
+        Raises:
+            pygame.error: If pygame fails to initialize.
+        """
         super().__init__()
         logger.info("Joystick thread initialized")
         self.__run_flag = True
@@ -68,11 +145,31 @@ class JoystickThread(QThread):
         self.__joystick_timer.start(10)
 
     def stop(self):
+        """
+        Stops the execution of the thread by setting the internal run flag to False
+        and waits for the thread to finish its execution.
+        """
         self.__run_flag = False
         self.wait()
 
     # Joystick reconnect/disconnect handler
     def _wait_for_joystick(self):
+        """
+        Waits for a joystick to be connected and initializes it if detected.
+
+        This method ensures that pygame is properly reinitialized to detect
+        any newly connected joysticks. If a joystick is detected, it initializes
+        the joystick and stops the timer that repeatedly calls this method.
+
+        Steps:
+        1. Quit and reinitialize pygame to refresh joystick detection.
+        2. Check if any joysticks are connected.
+        3. If a joystick is detected, initialize it and stop the waiting timer.
+
+        Note:
+            This method is necessary because pygame does not automatically detect
+            joysticks that are connected after the initial initialization.
+        """
         # pygame must be quit and then reinitialized so that joysticks can be detected.
         # If not, then pygame will say that 0 joysticks are available even if you reconnect a joystick after disconnecting it.
         pygame.quit()
@@ -82,6 +179,17 @@ class JoystickThread(QThread):
             self._wait_for_joystick_timer.stop()
 
     def _initialize_joystick(self):
+        """
+        Initializes the joystick device and sets up its connection.
+
+        This method assumes that the joystick is the first device (index 0)
+        and initializes it using the pygame library. It logs the joystick's
+        name, updates the connection status bar in the GUI, and applies a
+        green text style to indicate a successful connection.
+
+        Raises:
+            pygame.error: If no joystick is found or initialization fails.
+        """
         # Assume that our joystick is the first device.
         self.__joystick = pygame.joystick.Joystick(0)
         # Initialize the joystick through pygame.
@@ -95,6 +203,21 @@ class JoystickThread(QThread):
 
     @pyqtSlot(dict)
     def handle_joystick(self, commands):
+        """
+        Slot to handle joystick events.
+
+        This method is triggered when a joystick event occurs. It processes the
+        event data provided in the `commands` dictionary.
+
+        Args:
+            commands (dict): A dictionary containing joystick event data.
+                - "connected" (bool): Indicates whether the joystick is connected
+                (True) or disconnected (False).
+
+        Behavior:
+            - Logs a warning message if the joystick is disconnected.
+            - Placeholder for additional functionality when the joystick is connected.
+        """
         # Contains True/False depending on whether or not a joystick is connected.
         is_joystick_connected = commands.get("connected")
         # If False, then the joystick has been disconnected.
@@ -104,6 +227,44 @@ class JoystickThread(QThread):
             pass  # If joystick is connected, we can do stuff here.
 
     def check_joystick_input(self):
+        """
+        Handles joystick input, processes axis and button data, and communicates with the Arduino.
+
+        This method checks for joystick input, processes the axis and button values, applies deadzones,
+        calculates pulsewidths for motor control, and sends the data to the Arduino. It also updates
+        the GUI and emits signals for joystick connection status.
+
+        Key functionalities:
+        - Reads joystick axis and button inputs.
+        - Applies deadzones to joystick axes and triggers to prevent unintended movements.
+        - Calculates pulsewidths for motor control based on joystick input.
+        - Sends processed data to the Arduino at a controlled interval.
+        - Updates GUI elements to reflect joystick status and thrust values.
+        - Emits signals for joystick connection changes.
+        - Handles joystick disconnection and attempts to reconnect.
+
+        Joystick button functionality:
+        - Button 4: Captures a screenshot using the video thread.
+
+        Rumble functionality:
+        - Determines rumble frequency based on the highest joystick axis value and activates rumble.
+
+        Notes:
+        - Requires a valid joystick connection and the `pygame` library for joystick handling.
+        - Ensures `pygame.event.pump()` is called to handle internal OS interactions.
+
+        Emits:
+        - `joystick_change_signal`: Signal containing joystick connection status and axis information.
+
+        Sends:
+        - Data to the Arduino via a separate thread to avoid blocking.
+
+        Handles:
+        - Joystick disconnection by updating the GUI and attempting to reconnect.
+
+        Raises:
+        - None
+        """
         # If we have a valid joystick connection
         if self.__joystick is not None and pygame.joystick.get_count() > 0:
             # This is necessary: https://www.pygame.org/docs/ref/event.html
@@ -246,6 +407,27 @@ class JoystickThread(QThread):
     # 1900: Full forward thrust
 
     def __calculate_pulsewidth(self, axis_info):
+        """
+        Calculate the pulsewidth values for various motor controls based on joystick input.
+        This method processes the input from the joystick axes and maps them to corresponding
+        pulsewidth values for controlling the ROV's motors. The pulsewidth values are calculated
+        for forward/backward movement, left/right movement, ascending/descending, and pitch control.
+        Args:
+            axis_info (dict): A dictionary containing joystick axis values. The keys are:
+                - "tLeft_LeftRight": Horizontal movement of the left thumbstick (-1.0 to 1.0).
+                - "tLeft_UpDown": Vertical movement of the left thumbstick (-1.0 to 1.0).
+                - "tRight_LeftRight": Horizontal movement of the right thumbstick (-1.0 to 1.0).
+                - "tRight_UpDown": Vertical movement of the right thumbstick (-1.0 to 1.0).
+        Returns:
+            dict: A dictionary containing the calculated pulsewidth values for the motors:
+                - "forward_backward_pulsewidth": Pulsewidth for forward/backward movement.
+                - "left_pulsewidth": Pulsewidth for the left motor.
+                - "right_pulsewidth": Pulsewidth for the right motor.
+                - "ascend_descend_pulsewidth": Pulsewidth for ascending/descending movement.
+                - "pitch_left_pulsewidth": Pulsewidth for pitch control on the left motor.
+                - "pitch_right_pulsewidth": Pulsewidth for pitch control on the right motor.
+        """
+
         left_thumbstick_left_right = axis_info.get("tLeft_LeftRight")
         left_thumbstick_up_down = axis_info.get("tLeft_UpDown")
         right_thumbstick_left_right = axis_info.get("tRight_LeftRight")
@@ -349,14 +531,61 @@ class JoystickThread(QThread):
         }
 
     # Configured so that small joystick movements (stick drift, rumbles, etc) don't cause drifts away from 1500.
-
     def __map_to_pwm(self, val):
+        """
+        Maps a given input value to a corresponding PWM (Pulse Width Modulation) signal.
+
+        Args:
+            val (float): The input value to be mapped. Expected range is [-1, 1].
+
+        Returns:
+            int: The PWM signal value. Returns 1500 if the input value is within the deadzone range 
+                 defined by PWM_DEADZONE_MIN. Otherwise, calculates the PWM value based on the input.
+        """
         if val >= -PWM_DEADZONE_MIN and val <= PWM_DEADZONE_MIN:
             return 1500
         else:
             return 400*(val + 1) + 1100
 
     def __update_thrust_labels(self, pulsewidths):
+        """
+        Updates the thrust labels based on the provided pulsewidths for different
+        directions and movements of the ROV (Remotely Operated Vehicle).
+
+        This method calculates the thrust percentage and determines the direction
+        (e.g., forward, backward, upward, downward, left, right, clockwise, or
+        counter-clockwise) based on the pulsewidth values. It then updates the
+        corresponding labels with the calculated thrust information.
+
+        Args:
+            pulsewidths (dict): A dictionary containing pulsewidth values for
+                different movements. The keys and their expected values are:
+                    - "forward_backward_pulsewidth" (int): Pulsewidth for forward
+                      or backward movement.
+                    - "ascend_descend_pulsewidth" (int): Pulsewidth for upward or
+                      downward movement.
+                    - "left_pulsewidth" (int): Pulsewidth for left movement.
+                    - "right_pulsewidth" (int): Pulsewidth for right movement.
+                    - "pitch_left_pulsewidth" (int): Pulsewidth for counter-clockwise
+                      pitch movement.
+                    - "pitch_right_pulsewidth" (int): Pulsewidth for clockwise
+                      pitch movement.
+
+        Behavior:
+            - If the pulsewidth is less than 1500, it indicates reverse or downward
+              movement, or counter-clockwise pitch.
+            - If the pulsewidth is equal to 1500, it indicates no movement.
+            - If the pulsewidth is greater than 1500, it indicates forward or upward
+              movement, or clockwise pitch.
+
+        Updates:
+            - Updates the following labels with the calculated thrust direction and
+              percentage:
+                - `self.__forward_backward_thrust_label`
+                - `self.__vertical_thrust_label`
+                - `self.__left_right_thrust_label`
+                - `self.__pitch_thrust_label`
+        """
         # If forward thrust (pw > 1500): say direction is forward with thrust percentage
         forward_backward_thrust_label_text = None
         vertical_thrust_label_text = None

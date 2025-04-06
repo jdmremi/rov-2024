@@ -21,7 +21,55 @@ logger = logging.getLogger(__name__)
 
 
 class Main(QMainWindow):
+    """"
+    Main application window for the ROV control interface.
+
+    This class initializes and manages the main GUI components, including the video widget,
+    status bar, and threads for Arduino and joystick communication.
+
+    Attributes:
+        __layout (QHBoxLayout): The main layout for the central widget.
+        __video_widget (VideoWidget): Widget for displaying video feed.
+        __container (QWidget): Container widget for the main layout.
+        __status_bar (QStatusBar): Status bar for displaying various statuses.
+        __status_bar_widgets (dict): Dictionary of QLabel widgets for displaying specific statuses.
+        __arduino_thread (ArduinoThread): Thread for handling Arduino communication.
+        __joystick_thread (JoystickThread): Thread for handling joystick communication.
+
+    Methods:
+        update_arduino_status(data):
+            Updates the status bar with data received from the Arduino.
+    """
+
     def __init__(self, width, height):
+        """
+        Initializes the main application window with the specified width and height.
+
+        This constructor sets up the main window, including its title, size, layout, 
+        and various widgets such as a video display, status bar, and threads for 
+        Arduino and joystick handling.
+
+        Args:
+            width (int): The width of the main application window.
+            height (int): The height of the main application window.
+
+        Attributes:
+            __layout (QHBoxLayout): The main layout for the application window.
+            __video_widget (VideoWidget): The widget responsible for video display.
+            __container (QWidget): The container widget holding the main layout.
+            __status_bar (QStatusBar): The status bar displaying various status widgets.
+            __status_bar_widgets (dict): A dictionary of QLabel widgets for displaying 
+                status information such as joystick status, thrust status, and claw status.
+            __arduino_thread (ArduinoThread): A thread for handling Arduino-related data.
+            __joystick_thread (JoystickThread): A thread for handling joystick input and 
+                updating relevant status widgets.
+
+        Behavior:
+            - Initializes and configures the main layout and widgets.
+            - Sets up the status bar with various status widgets.
+            - Initializes and connects threads for Arduino and joystick handling.
+            - Maximizes the application window upon startup.
+        """
         super().__init__()
         self.setWindowTitle(WINDOW_TITLE)
         self.setMinimumSize(width, height)
