@@ -5,7 +5,7 @@
 # Requirements
 
 - Python 3.12.3.
-- Full instatllation of dependencies (`pip install -r requirements.txt`).
+- Full installation of dependencies (`pip install -r requirements.txt`).
 
 # Running
 
